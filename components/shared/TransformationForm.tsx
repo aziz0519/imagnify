@@ -26,8 +26,11 @@ import {
 import { Input } from "@/components/ui/input"
 import { aspectRatioOptions,defaultValues, transformationTypes } from "@/constants"
 import { CustomField } from "./CustomField"
-import { useState } from "react"
-import { AspectRatioKey } from "@/lib/utils"
+import { useState, useTransition } from "react"
+import { AspectRatioKey, deepMergeObjects } from "@/lib/utils"
+import MediaUploader from "./MediaUploader"
+import TransformedImage from "./TransformedImage"
+import { useRouter } from "next/navigation"
 
 export const formSchema = z.object({
   title: z.string(),
@@ -39,11 +42,15 @@ export const formSchema = z.object({
 
 
 
-const TransformationForm = ({action, data=null, userId, type, creditBalance}: TransformationFormProps) => {
+const TransformationForm = ({action, data = null, userId, type, creditBalance, config = null}: TransformationFormProps) => {
 
     const transformationType = transformationTypes[type];
     const [image, setImage] = useState(data)
-    const [newTransformation, setnewTransformation] = useState<Transformations | null>(null)
+    const [newTransformation, setnewTransformation] = useState<Transformations | null>(null);
+    const [isTransforming, setIsTransforming] = useState(false);
+    const [transformationConfig, setTransformationConfig] = useState(config);
+    const [isPending, startTransition] = useTransition()
+    const router = useRouter()
 
     const initialValues = data && action === 'Update' ? {
         title: data?.title,
@@ -70,6 +77,14 @@ const TransformationForm = ({action, data=null, userId, type, creditBalance}: Tr
 
     const onInputChangeHandler = (fieldName:string, value:string, type:string, onChange: (value:string) => void) => {
 
+    }
+
+    const onTransformHandler = async () => {
+      setIsTransforming(true)
+
+      setTransformationConfig(
+        deepMergeObjects(newTransformation, transformationConfig)
+      )
     }
   return (
     <Form {...form}>
@@ -148,12 +163,42 @@ const TransformationForm = ({action, data=null, userId, type, creditBalance}: Tr
                  />)}
                />
             )}
-
           </div>
         )}
+        <div className="media-uploader-field">
+          <CustomField
+          control={form.control}
+          name="publicId"
+          className="flex size-full flex-col"
+          render={({ field }) => (
+            <MediaUploader
+            onValueChange={field.onChange}
+            setImage={setImage}
+            publicId={field.value}
+            image={image}
+            type={type}
+            />
+          )} 
+          />
+          <TransformedImage 
+          image={image}
+          type={type}
+          title={form.getValues().title}
+          isTransforming={isTransforming}
+          setIsTransforming={setIsTransforming}
+          transformationConfig={transformationConfig}
+          />
+        </div>
+        <div className="flex flex-col gap-4">
         <Button
         className="submit-button capitalize" 
-        type="submit">Submit</Button>
+        type="submit"
+        disabled={isTransforming || newTransformation === null}
+        onClick={onTransformHandler}
+        >
+          {isTransforming ? 'Transforming...' : 'Apply Transformation'}
+        </Button>
+        </div>
       </form>
     </Form>
   )
